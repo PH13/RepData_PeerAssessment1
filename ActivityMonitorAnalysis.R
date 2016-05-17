@@ -1,0 +1,129 @@
+## Code for reading in the dataset and/or processing the data
+
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(ggthemes)
+library(scales)
+library(lubridate)
+
+
+
+activity <- read.csv("~/Downloads/activity.csv", colClasses = c('numeric', 'Date', 'numeric'))
+
+head(activity)
+str(activity)
+
+
+total.steps <- aggregate(steps ~ date, activity, sum)
+
+                          
+## Histogram of the total number of steps taken each day
+
+
+qplot(total.steps$steps,
+      main = "Histogram of Total Steps Per Day",
+      xlab = 'Total Steps per Day', 
+      ylab = "Frequency", 
+      binwidth = 400)
+
+
+## Mean and median number of steps taken each day
+
+mean(total.steps$steps, na.rm = TRUE)
+median(total.steps$steps, na.rm = TRUE)
+
+## Time series plot of the average number of steps taken
+
+activity$Interval <- as.POSIXct(strptime(sprintf("%04d", activity$interval), "%H%M"))
+
+avg.steps <- aggregate(x=list(steps=activity$steps), by=list(interval=activity$Interval), FUN = mean, na.rm=TRUE)
+
+
+ggplot(data = avg.steps, aes(x=interval, y=steps)) + 
+        geom_line(color = "steelblue") +
+        theme(axis.text.x=element_text(angle = 315,
+                                       hjust = 0.5,
+                                       vjust = 0.5,
+                                       size = 10))+
+        ggtitle("Average Number of Steps Taken Throughout a Day") +
+        scale_x_datetime(breaks = date_breaks("2 hour"),
+                         labels = date_format("%H:%M", tz = "")) +
+        xlab("Time")+
+        ylab("Average Step Frequency")
+
+
+## The 5-minute interval that, on average, contains the maximum number of steps
+
+avg.steps[which.max(avg.steps$steps),]
+
+## Code to describe and show a strategy for imputing missing data
+
+sum(is.na(activity$steps))
+
+
+fillNA <- activity %>%
+        group_by(Interval) %>%
+        summarise(avg_steps = mean(steps, na.rm = TRUE)) %>%
+        merge(activity, .) %>%
+        mutate(steps = ifelse(is.na(steps)==TRUE, avg_steps, steps)) %>%
+        select(-avg_steps)
+
+sum(is.na(fillNA$steps))
+
+
+
+## Histogram of the total number of steps taken each day after missing values are imputed
+
+total.fillNA <- aggregate(x = list(steps = fillNA$steps) , 
+                         by = list(date= fillNA$date),
+                         FUN = sum, na.rm=TRUE)
+head(total.fillNA)
+
+
+
+qplot(total.fillNA$steps,
+      main = "Histogram of Total Steps Per Day (with imputed values)",
+      xlab = 'Total Steps per Day', 
+      ylab = "Frequency", 
+      binwidth = 400)
+
+
+mean(total.fillNA$steps)
+median(total.fillNA$steps)
+
+## New data set with day factor with two levels (weekday and weekend)
+
+daytype.function <- function(X) {
+        daytype <- weekdays(X)
+        if (daytype %in% c("Saturday", "Sunday"))
+                return("weekend")
+        else if (daytype %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+                return("weekday")
+}
+
+final.data <- fillNA
+final.data$date <- as.Date(final.data$date)
+final.data$daytype <- sapply(final.data$date, FUN = daytype.function)
+
+head(final.data)
+
+#Panel plot of data weekday vs. weekend
+
+last.plot <- aggregate(steps ~ Interval + daytype, data = final.data, mean)
+
+ggplot(last.plot, aes(x= Interval, y= steps, colour = daytype)) +
+        geom_line() +
+        facet_grid(daytype ~ .) +
+        theme(legend.position="none", 
+              axis.text.x=element_text(angle = 315,
+                                       hjust = 0.5,
+                                       vjust = 0.5,
+                                       size = 10)) + 
+        ggtitle("Steps Taken Weekday vs.Weekend") +
+        scale_x_datetime(breaks = date_breaks("2 hour"),
+                         labels = date_format("%H:%M", tz = "")) +
+        xlab("Time")+
+        ylab("Average Step Frequency")
+
+
