@@ -2,9 +2,9 @@
 title: "PA1_template"
 author: "Peter Hagen"
 date: "May 15, 2016"
-output:
-  md_document:
-    variant: markdown_github
+output: 
+  html_document: 
+    keep_md: yes
 ---
 
 #Reproducible Research: Peer Assesment 1
